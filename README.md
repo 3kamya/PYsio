@@ -3,7 +3,7 @@ PYsio is a Python-based application that helps physiotherapists manage, track, a
 It was inspired by observing how traditional note-taking and manual tracking systems can be *haphazard and time-consuming*.  
 Seeing how my sister (a physiotherapist) struggled with spreadsheets, voice notes, and scattered paper files motivated me to build a cleaner, centralized solution.  
 
-PYsio brings everything into one dashboard — voice-to-text logging, progress visualization, and patient management — all built entirely in Python.  
+PYsio brings everything into one dashboard like voice-to-text logging, progress visualization, and patient management; all built entirely in Python.  
 ##  Features  
 -  **Patient Management:** Add, view, and edit patient details  
 -  **Voice-to-Text Notes:** Record therapist notes and convert them to text  
