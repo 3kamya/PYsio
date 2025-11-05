@@ -41,5 +41,5 @@ The system will allow users to:
 | Voice Input | SpeechRecognition, PyAudio |
 | Visualization | Matplotlib, WordCloud |
 | Storage | CSV → Firebase/PostgreSQL (future) |
-| Language | Python 3.x |
+| Language | Python 3.13 |
 | Version Control | Git + GitHub |
