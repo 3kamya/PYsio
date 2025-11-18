@@ -2,32 +2,49 @@
 from dataclasses import dataclass, asdict
 from typing import Optional
 
+# -----------------------------
+# NEW: Fix missing classes
+# -----------------------------
+@dataclass
+class ROMEntry:
+    joint: Optional[str]
+    active: Optional[float]
+    passive: Optional[float]
+
+@dataclass
+class StrengthEntry:
+    muscle_group: Optional[str]
+    grade: Optional[int]   # 0–5
+
+# -----------------------------
+# Main Patient Record
+# -----------------------------
 @dataclass
 class PatientRecord:
     # Patient Information
-    patient_id: str                 # assigned by data_module
+    patient_id: str
     name: str
     age: int
     sex: str
-    surgery_date: str               # ISO date string 'YYYY-MM-DD'
+    surgery_date: str
     contact: str
     surgical_procedure: str
 
     # Post-Operative Status
-    pain_level: int                 # VAS 0-10
+    pain_level: int
     swelling: bool
     swelling_location: Optional[str]
     wound_condition: str
     infection_signs: str
 
     # Functional Assessment
-    mobility_status: str            # Walking unaided / With aid / Wheelchair / Bedridden
-    bed_to_chair_transfers: str     # Independent / Assistance required
-    bathing: str                    # Independent / Assistance
-    dressing: str                   # Independent / Assistance
-    toileting: str                  # Independent / Assistance
+    mobility_status: str
+    bed_to_chair_transfers: str
+    bathing: str
+    dressing: str
+    toileting: str
 
-    # Physiotherapy Assessment (fixed 2 entries for Week 2)
+    # Physiotherapy Assessment (Week 2)
     rom1_joint: Optional[str]
     rom1_active: Optional[float]
     rom1_passive: Optional[float]
@@ -36,9 +53,9 @@ class PatientRecord:
     rom2_passive: Optional[float]
 
     strength1_group: Optional[str]
-    strength1_grade: Optional[int]  # 0-5
+    strength1_grade: Optional[int]
     strength2_group: Optional[str]
-    strength2_grade: Optional[int]  # 0-5
+    strength2_grade: Optional[int]
 
     pain_behavior: str
     balance_gait: str
