@@ -39,7 +39,7 @@ if page == "🏠 Home":
         - Generate visual progress reports
         - Save everything securely in a local or cloud database
     """)
-    st.image("https://cdn-icons-png.flaticon.com/512/4201/4201973.png", width=200)
+    '''st.image("https://cdn-icons-png.flaticon.com/512/14069/14069128.png", width=200)'''
 
 # ------------------------------
 # PATIENT RECORDS PAGE
