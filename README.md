@@ -47,16 +47,16 @@ Backend Development
 *Replace the existing CSV or placeholder storage with proper SQL-based CRUD operations. Implement insert, fetch, update, and delete functions.*
 
 UI Improvements
-*Enhance the Patient Records page by adding search, filtering, and sorting options so users can easily navigate large sets of records.
+*Enhance the Patient Records page by adding search, filtering, and sorting options so users can easily navigate large sets of records.*
 
 Voice Notes Module
-Start integrating the speech-to-text system using Python's SpeechRecognition library. Implement a basic prototype inside the Streamlit UI.
+*Start integrating the speech-to-text system using Python's SpeechRecognition library. Implement a basic prototype inside the Streamlit UI.*
 
 Data Validation
-Strengthen the form validation system to prevent empty or inconsistent patient entries. Ensure smoother handling of dates and numeric ranges.
+*Strengthen the form validation system to prevent empty or inconsistent patient entries. Ensure smoother handling of dates and numeric ranges.*
 
 Architecture Updates
-Update the technical architecture documentation (in README or docs folder) to reflect the addition of PostgreSQL and new project flow.
+*Update the technical architecture documentation (in README or docs folder) to reflect the addition of PostgreSQL and new project flow.*
 
 Testing
-Write basic functional tests to ensure database reads, writes, and updates are working correctly.
+*Write basic functional tests to ensure database reads, writes, and updates are working correctly.*
