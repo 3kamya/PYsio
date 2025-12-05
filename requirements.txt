@@ -1,9 +1,9 @@
 streamlit==1.29.0
-pandas==2.1.1
-numpy==1.27.4
 matplotlib==3.8.0        # plotting library
 plotly==5.16.1
 reportlab==4.0.2
 psycopg2-binary==2.9.9  # PostgreSQL support
 speechrecognition==3.9.0 # Voice-to-text module
+numpy==1.27.4
+pandas==2.1.1
 pydub==0.25.1            # Audio file handling (required by speech recognition)
