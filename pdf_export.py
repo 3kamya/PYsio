@@ -58,7 +58,8 @@ def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], 
             # Display pain level if available
             if s.get("pain_level"):
                 pdf.set_font("Arial", size=10, style="I")
-                pdf.cell(0, 5, f"  Pain Level: {s['pain_level']}", ln=1)
+                # Removed U+00A0 from indentation
+                pdf.cell(0, 5, f"  Pain Level: {s['pain_level']}", ln=1) 
                 pdf.set_font("Arial", size=11)
             
             pdf.ln(1) # Small space between sessions
