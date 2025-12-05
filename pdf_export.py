@@ -20,7 +20,7 @@ def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], 
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Arial", size=16)
-    pdf.cell(0, 10, "PYsio — Patient Summary", ln=1, align="C")
+    pdf.cell(0, 10, "PYsio Patient Summary", ln=1, align="C")
     pdf.ln(4)
 
     # -------------------------------
