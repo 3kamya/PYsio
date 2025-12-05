@@ -3,7 +3,7 @@ from fpdf import FPDF
 from typing import Dict, Any, List
 import json
 from datetime import datetime
-from data_visualization import (
+from data_visualisation import (
     plot_rom_progress,
     plot_strength_progress,
     plot_pain_trend,
