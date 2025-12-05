@@ -1,19 +1,13 @@
-# ui_voice.py
-# ui_voice.py
 import streamlit as st
 import json
+# Keep your existing imports
 from voice_module import transcribe_uploaded_file, transcribe_microphone
 from voice_parser import extract_rom_data
 from datamod_sql import get_all_patients, get_patient, add_session, update_patient_fields
 
-# ----------------------------
-# Helper: Normalize parser output
-# ----------------------------
+# Keep your normalize_parsed function exactly as it is
 def normalize_parsed(parsed_list):
-    """
-    Convert parser list output into a dict keyed by type.
-    Ensures consistent storage.
-    """
+    # ... (Keep your existing code here) ...
     result = {
         "rom": [],
         "strength": [],
@@ -40,17 +34,23 @@ def normalize_parsed(parsed_list):
     return result
 
 # ----------------------------
-# MAIN UI FUNCTION
+# MAIN UI FUNCTION (FIXED)
 # ----------------------------
 def voice_note_ui():
     st.header("Voice Notes — Transcribe & Auto-Fill")
+
+    # 1. INITIALIZE SESSION STATE
+    # We need to remember these values across reruns (between Record and Apply)
+    if "v_transcript" not in st.session_state:
+        st.session_state["v_transcript"] = ""
+    if "v_parsed" not in st.session_state:
+        st.session_state["v_parsed"] = {}
 
     patients = get_all_patients()
     if not patients:
         st.warning("No patients found. Add a patient first in Patient Records.")
         return
 
-    # Patient selector
     options = [f"{p['id']} — {p['name']}" for p in patients]
     selected = st.selectbox("Select patient to update", options)
     pid = int(selected.split(" — ")[0])
@@ -58,9 +58,6 @@ def voice_note_ui():
     st.write("Upload audio, record, or paste transcript:")
     uploaded = st.file_uploader("Upload audio (wav/mp3)", type=["wav", "mp3", "m4a"])
     manual_text = st.text_area("Or paste transcript here")
-
-    parsed = []
-    transcript = ""
 
     col1, col2 = st.columns(2)
 
@@ -71,33 +68,44 @@ def voice_note_ui():
         if st.button("Record from Microphone (short)"):
             st.info("Recording... speak now")
             transcript = transcribe_microphone()
-            st.subheader("Transcript")
-            st.write(transcript)
-            parsed = extract_rom_data(transcript)
+            
+            # SAVE TO SESSION STATE
+            st.session_state["v_transcript"] = transcript
+            raw_parsed = extract_rom_data(transcript)
+            st.session_state["v_parsed"] = normalize_parsed(raw_parsed)
 
     # ----------------------------
     # UPLOAD OR PASTED TEXT
     # ----------------------------
     with col2:
         if st.button("Transcribe Upload / Paste"):
+            transcript = ""
             if uploaded:
                 transcript = transcribe_uploaded_file(uploaded)
             elif manual_text:
                 transcript = manual_text
             else:
                 st.error("Please upload audio or paste text.")
-                return
-
-            st.subheader("Transcript")
-            st.write(transcript)
-            parsed = extract_rom_data(transcript)
-
-    parsed = normalize_parsed(parsed)
+            
+            # SAVE TO SESSION STATE (Only if we got a transcript)
+            if transcript:
+                st.session_state["v_transcript"] = transcript
+                raw_parsed = extract_rom_data(transcript)
+                st.session_state["v_parsed"] = normalize_parsed(raw_parsed)
 
     # ----------------------------
-    # CHECK FOR ANY ACTIONABLE DATA
+    # DISPLAY CURRENT STATE
     # ----------------------------
+    # Always display from session_state, not local variables
+    if st.session_state["v_transcript"]:
+        st.subheader("Transcript")
+        st.write(st.session_state["v_transcript"])
+
+    parsed = st.session_state["v_parsed"]
+
+    # Check actionable data
     def has_actionable_data(parsed_dict):
+        if not parsed_dict: return False
         return any([
             parsed_dict.get("pain_level") is not None,
             parsed_dict.get("swelling") is not None,
@@ -108,23 +116,20 @@ def voice_note_ui():
         ])
 
     if not has_actionable_data(parsed):
-        st.info("No actionable data parsed from transcript.")
+        st.info("No actionable data parsed yet.")
         return
 
     st.subheader("Parsed Values (suggested)")
     st.json(parsed)
 
     # ----------------------------
-    # LOAD EXISTING PATIENT DATA
-    # ----------------------------
-    patient = get_patient(pid)
-
-    # ----------------------------
     # BUILD UPDATES DICT
     # ----------------------------
+    # Rerun the logic to build 'updates' based on the persistent 'parsed' data
+    patient = get_patient(pid)
     updates = {}
 
-    # ROM
+    # ROM Logic
     rom_entries_existing = []
     if patient.get("rom_entries"):
         try:
@@ -132,19 +137,19 @@ def voice_note_ui():
         except:
             rom_entries_existing = []
 
-    for r in parsed["rom"]:
-        joint = r.get("rom_type") or r.get("joint")
-        if joint:
-            rom_entries_existing.append({
-                "joint": joint,
-                "start": r.get("start"),
-                "end": r.get("end")
-            })
+    if "rom" in parsed:
+        for r in parsed["rom"]:
+            joint = r.get("rom_type") or r.get("joint")
+            if joint:
+                rom_entries_existing.append({
+                    "joint": joint,
+                    "start": r.get("start"),
+                    "end": r.get("end")
+                })
+        if parsed["rom"]: # Only update if new ROM data exists
+            updates["rom_entries"] = json.dumps(rom_entries_existing)
 
-    if rom_entries_existing:
-        updates["rom_entries"] = json.dumps(rom_entries_existing)
-
-    # Strength
+    # Strength Logic
     strength_entries_existing = []
     if patient.get("strength_entries"):
         try:
@@ -152,32 +157,29 @@ def voice_note_ui():
         except:
             strength_entries_existing = []
 
-    for s in parsed["strength"]:
-        mg = s.get("muscle_group") or s.get("muscle")
-        grade = s.get("grade")
-        if mg is not None and grade is not None:
-            strength_entries_existing.append({
-                "muscle_group": mg,
-                "grade": grade
-            })
+    if "strength" in parsed:
+        for s in parsed["strength"]:
+            mg = s.get("muscle_group") or s.get("muscle")
+            grade = s.get("grade")
+            if mg is not None and grade is not None:
+                strength_entries_existing.append({
+                    "muscle_group": mg,
+                    "grade": grade
+                })
+        if parsed["strength"]:
+            updates["strength_entries"] = json.dumps(strength_entries_existing)
 
-    if strength_entries_existing:
-        updates["strength_entries"] = json.dumps(strength_entries_existing)
-
-    # Swelling
-    if parsed["swelling"] is not None:
+    # Simple Fields
+    if parsed.get("swelling") is not None:
         updates["swelling"] = "Yes" if parsed["swelling"] else "No"
 
-    # Pain level
-    if parsed["pain_level"] is not None:
+    if parsed.get("pain_level") is not None:
         updates["pain_level"] = parsed["pain_level"]
 
-    # Infection signs
-    if parsed["infection_signs"]:
+    if parsed.get("infection_signs"):
         updates["infection_signs"] = json.dumps(parsed["infection_signs"])
 
-    # Mobility status
-    if parsed["mobility_status"]:
+    if parsed.get("mobility_status"):
         updates["mobility_status"] = json.dumps(parsed["mobility_status"])
 
     st.markdown("**Suggested updates:**")
@@ -188,10 +190,18 @@ def voice_note_ui():
     # ----------------------------
     if st.button("Apply suggested updates to patient"):
         if updates:
+            # We use the transcript from session_state for the session log
+            transcript_to_save = st.session_state["v_transcript"]
+            
             ok = update_patient_fields(pid, updates)
-            add_session(pid, transcript, parsed, parsed.get("pain_level"))
+            add_session(pid, transcript_to_save, parsed, parsed.get("pain_level"))
+            
             if ok:
                 st.success("Patient record updated and session saved.")
+                # Optional: Clear state after successful save
+                st.session_state["v_transcript"] = ""
+                st.session_state["v_parsed"] = {}
+                st.rerun() # Refresh page to show clean state
             else:
                 st.error("Failed to update patient.")
         else:
