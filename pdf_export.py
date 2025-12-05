@@ -3,6 +3,17 @@ from fpdf import FPDF
 from typing import Dict, Any, List
 import json
 from datetime import datetime
+from data_visualization import (
+    plot_rom_progress,
+    plot_strength_progress,
+    plot_pain_trend,
+    plot_swelling_trend,
+    plot_pain_histogram,
+    plot_rom_vs_strength,
+    plot_improvement_percentage
+)
+from reportlab.platypus import Image
+
 
 def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], out_path: str):
     pdf = FPDF()
@@ -22,6 +33,7 @@ def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], 
     pdf.set_font("Arial", size=12, style="B")
     pdf.cell(0, 8, "Recent Sessions:", ln=1)
     pdf.set_font("Arial", size=11)
+    
     if not sessions:
         pdf.cell(0, 6, "No sessions recorded.", ln=1)
     else:
@@ -42,6 +54,30 @@ def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], 
     pdf.ln(6)
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 8, f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
+    # Generate visualisation charts
+    rom_path = plot_rom_progress(patient_id)
+    strength_path = plot_strength_progress(patient_id)
+    pain_path = plot_pain_trend(patient_id)
+    swelling_path = plot_swelling_trend(patient_id)
+    hist_path = plot_pain_histogram(patient_id)
+    scatter_path = plot_rom_vs_strength(patient_id)
+    improve_path = plot_improvement_percentage(patient_id)
+    story.append(Paragraph("DATA VISUALISATION", heading_style))
+    story.append(Spacer(1, 12))
 
+    chart_paths = [("ROM Progress", rom_path),
+    ("Strength Progress", strength_path),
+    ("Pain Trend", pain_path),
+    ("Swelling Trend", swelling_path),
+    ("Pain Histogram", hist_path),
+    ("ROM vs Strength", scatter_path),
+    ("Recovery Percentage", improve_path)
+     ]
+
+    for title, img_path in chart_paths:
+        if img_path:
+            story.append(Paragraph(title, normal_style))
+            story.append(Image(img_path, width=400, height=300))
+            story.append(Spacer(1, 24))
     pdf.output(out_path)
-    return out_path
+        return out_path
