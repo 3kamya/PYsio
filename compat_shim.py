@@ -22,7 +22,7 @@ from datamod_sql import (
 )
 
 # voice / parser
-from voice_text import transcribe_voice
+from voice_module import transcribe_microphone
 from voice_module import transcribe_uploaded_file  # used for uploaded files
 from voice_parser import extract_rom_data
 
