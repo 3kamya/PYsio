@@ -9,19 +9,37 @@ from datamod_sql import (
 )
 
 # ----------------------------
-# FIX: Normalize parsed output
+# Helper: Normalize parser output
 # ----------------------------
-def normalize_parsed(parsed):
+def normalize_parsed(parsed_list):
     """
-    Ensure parsed is always a list of dicts.
+    Convert parser list output into a dict keyed by type.
+    Ensures consistent storage.
     """
-    if parsed is None:
-        return []
-    if isinstance(parsed, dict):
-        return [parsed]
-    if isinstance(parsed, list):
-        return [p for p in parsed if isinstance(p, dict)]
-    return []
+    result = {
+        "rom": [],
+        "strength": [],
+        "swelling": None,
+        "pain_level": None,
+        "infection_signs": [],
+        "mobility_status": []
+    }
+    for item in parsed_list:
+        t = item.get("type")
+        if t == "rom":
+            result["rom"].append(item)
+        elif t == "strength":
+            result["strength"].append(item)
+        elif t == "swelling":
+            result["swelling"] = item.get("present")
+        elif t == "pain_level":
+            if item.get("pain_level") is not None:
+                result["pain_level"] = item.get("pain_level")
+        elif t == "infection_signs":
+            result["infection_signs"].extend(item.get("signs", []))
+        elif t == "mobility_status":
+            result["mobility_status"].append(item.get("status"))
+    return result
 
 # ----------------------------
 # MAIN UI FUNCTION
@@ -78,7 +96,7 @@ def voice_note_ui():
 
     parsed = normalize_parsed(parsed)
 
-    if not parsed:
+    if not any(parsed.values()):
         st.info("No actionable data parsed from transcript.")
         return
 
@@ -86,18 +104,11 @@ def voice_note_ui():
     st.json(parsed)
 
     # ----------------------------
-    # BUILD PATIENT UPDATE FIELDS
+    # LOAD EXISTING PATIENT DATA
     # ----------------------------
-    updates = {}
+    patient = get_patient(pid)
     rom_entries = []
     strength_entries = []
-    swelling = None
-    pain_level = None
-    infection_signs = []
-    mobility_status = []
-
-    # Load existing patient data
-    patient = get_patient(pid)
     if patient:
         if patient.get("rom_entries"):
             try:
@@ -110,41 +121,45 @@ def voice_note_ui():
             except:
                 strength_entries = []
 
-    # Parse each entry from the parser
-    for item in parsed:
-        if item.get("type") == "rom":
-            rom_entries.append({
-                "joint": item.get("rom_type"),
-                "start": item.get("start"),
-                "end": item.get("end")
-            })
-        elif item.get("type") == "strength":
-            strength_entries.append({
-                "muscle_group": item.get("muscle_group"),
-                "grade": item.get("grade")
-            })
-        elif item.get("type") == "swelling":
-            swelling = item.get("present")
-        elif item.get("type") == "pain_level":
-            pain_level = item.get("pain_level")
-        elif item.get("type") == "infection_signs":
-            infection_signs.extend(item.get("signs", []))
-        elif item.get("type") == "mobility_status":
-            mobility_status.append(item.get("status"))
+    # ----------------------------
+    # BUILD UPDATES DICT
+    # ----------------------------
+    updates = {}
 
-    # Build updates dict
+    # ROM
+    for r in parsed["rom"]:
+        rom_entries.append({
+            "joint": r["rom_type"],
+            "start": r["start"],
+            "end": r["end"]
+        })
     if rom_entries:
         updates["rom_entries"] = json.dumps(rom_entries)
+
+    # Strength
+    for s in parsed["strength"]:
+        strength_entries.append({
+            "muscle_group": s.get("muscle_group"),
+            "grade": s.get("grade")
+        })
     if strength_entries:
         updates["strength_entries"] = json.dumps(strength_entries)
-    if swelling is not None:
-        updates["swelling"] = "Yes" if swelling else "No"
-    if pain_level is not None:
-        updates["pain_level"] = pain_level
-    if infection_signs:
-        updates["infection_signs"] = json.dumps(infection_signs)
-    if mobility_status:
-        updates["mobility_status"] = json.dumps(mobility_status)
+
+    # Swelling
+    if parsed["swelling"] is not None:
+        updates["swelling"] = "Yes" if parsed["swelling"] else "No"
+
+    # Pain level
+    if parsed["pain_level"] is not None:
+        updates["pain_level"] = parsed["pain_level"]
+
+    # Infection signs
+    if parsed["infection_signs"]:
+        updates["infection_signs"] = json.dumps(parsed["infection_signs"])
+
+    # Mobility status
+    if parsed["mobility_status"]:
+        updates["mobility_status"] = json.dumps(parsed["mobility_status"])
 
     st.markdown("**Suggested updates:**")
     st.write(updates)
@@ -155,7 +170,7 @@ def voice_note_ui():
     if st.button("Apply suggested updates to patient"):
         ok = update_patient_fields(pid, updates)
         if ok:
-            add_session(pid, transcript, parsed, pain_level)
+            add_session(pid, transcript, parsed, parsed["pain_level"])
             st.success("Patient record updated and session saved.")
         else:
             st.error("Failed to update patient.")
