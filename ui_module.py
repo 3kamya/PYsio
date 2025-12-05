@@ -82,7 +82,7 @@ def patient_form():
 
     st.subheader("Progress Monitoring")
     assessment_date = st.date_input("Assessment Date")
-    follow_pain = st.slider("Follow-up Pain Level", 0, 10, 0)
+    followup_pain_level = st.slider("Follow-up Pain Level", 0, 10, 0)
     follow_swelling = st.selectbox("Swelling (follow-up)", ["Yes", "No"])
     follow_swelling = True if follow_swelling == "Yes" else False
 
@@ -129,7 +129,7 @@ def patient_form():
             "report_signs": report_signs,
             "medications": medications,
             "assessment_date": str(assessment_date),
-            "follow_pain": follow_pain,
+            "followup_pain_level": followup_pain_level,
             "follow_swelling": follow_swelling,
             "rom_improve": rom_improve,
             "strength_changes": strength_changes,
