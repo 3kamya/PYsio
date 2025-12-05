@@ -1,12 +1,10 @@
 # ui_voice.py
+# ui_voice.py (patched)
 import streamlit as st
 import json
 from voice_module import transcribe_uploaded_file, transcribe_microphone
 from voice_parser import extract_rom_data
-from datamod_sql import (
-    get_all_patients, get_patient, add_session,
-    update_patient_fields
-)
+from datamod_sql import get_all_patients, get_patient, add_session, update_patient_fields
 
 # ----------------------------
 # Helper: Normalize parser output
@@ -107,19 +105,6 @@ def voice_note_ui():
     # LOAD EXISTING PATIENT DATA
     # ----------------------------
     patient = get_patient(pid)
-    rom_entries = []
-    strength_entries = []
-    if patient:
-        if patient.get("rom_entries"):
-            try:
-                rom_entries = json.loads(patient["rom_entries"])
-            except:
-                rom_entries = []
-        if patient.get("strength_entries"):
-            try:
-                strength_entries = json.loads(patient["strength_entries"])
-            except:
-                strength_entries = []
 
     # ----------------------------
     # BUILD UPDATES DICT
@@ -127,23 +112,44 @@ def voice_note_ui():
     updates = {}
 
     # ROM
+    rom_entries_existing = []
+    if patient.get("rom_entries"):
+        try:
+            rom_entries_existing = json.loads(patient["rom_entries"])
+        except:
+            rom_entries_existing = []
+
     for r in parsed["rom"]:
-        rom_entries.append({
-            "joint": r["rom_type"],
-            "start": r["start"],
-            "end": r["end"]
-        })
-    if rom_entries:
-        updates["rom_entries"] = json.dumps(rom_entries)
+        joint = r.get("rom_type") or r.get("joint")
+        if joint:
+            rom_entries_existing.append({
+                "joint": joint,
+                "start": r.get("start"),
+                "end": r.get("end")
+            })
+
+    if rom_entries_existing:
+        updates["rom_entries"] = json.dumps(rom_entries_existing)
 
     # Strength
+    strength_entries_existing = []
+    if patient.get("strength_entries"):
+        try:
+            strength_entries_existing = json.loads(patient["strength_entries"])
+        except:
+            strength_entries_existing = []
+
     for s in parsed["strength"]:
-        strength_entries.append({
-            "muscle_group": s.get("muscle_group"),
-            "grade": s.get("grade")
-        })
-    if strength_entries:
-        updates["strength_entries"] = json.dumps(strength_entries)
+        mg = s.get("muscle_group") or s.get("muscle")
+        grade = s.get("grade")
+        if mg is not None and grade is not None:
+            strength_entries_existing.append({
+                "muscle_group": mg,
+                "grade": grade
+            })
+
+    if strength_entries_existing:
+        updates["strength_entries"] = json.dumps(strength_entries_existing)
 
     # Swelling
     if parsed["swelling"] is not None:
@@ -168,9 +174,12 @@ def voice_note_ui():
     # APPLY BUTTON
     # ----------------------------
     if st.button("Apply suggested updates to patient"):
-        ok = update_patient_fields(pid, updates)
-        if ok:
-            add_session(pid, transcript, parsed, parsed["pain_level"])
-            st.success("Patient record updated and session saved.")
+        if updates:
+            ok = update_patient_fields(pid, updates)
+            add_session(pid, transcript, parsed, parsed.get("pain_level"))
+            if ok:
+                st.success("Patient record updated and session saved.")
+            else:
+                st.error("Failed to update patient.")
         else:
-            st.error("Failed to update patient.")
+            st.error("No actionable data parsed from transcript.")
