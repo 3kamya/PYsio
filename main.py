@@ -1,12 +1,16 @@
 import streamlit as st
 from datetime import datetime
 from ui_module import patient_form
-from datamod_sql import save_record_sql, load_all_patients_sql, load_single_patient_sql
 from analytics import analytics_dashboard
-from pdf_export import generate_patient_pdf
 from ui_voice import voice_note_ui
-from voice_text import convert_voice_to_text
-from voice_parser import extract_structured_keywords
+from compat_shim import (
+    save_record_sql,
+    load_all_patients_sql,
+    load_single_patient_sql,
+    generate_patient_pdf,
+    convert_voice_to_text,
+    extract_structured_keywords
+)
 
 
 # ----------------------------------------------------
