@@ -1,35 +1,31 @@
 # ui_voice.py
+
 import streamlit as st
 import json
 from voice_module import transcribe_uploaded_file, transcribe_microphone
 from voice_parser import extract_rom_data
 from datamod_sql import (
     get_all_patients, find_patient_by_name, add_session,
-    update_patient_fields, get_patient, get_sessions_for_patient
+    update_patient_fields, get_patient, get_sessions_for_patient,
+    add_rom_progress
 )
 
 # ----------------------------
 # FIX: Normalize parsed output
 # ----------------------------
 def normalize_parsed(parsed):
-    """
-    Ensures parsed is ALWAYS a dictionary.
-    If parsed is a list, return the first dictionary.
-    If parsed is None or empty, return {}.
-    """
     if parsed is None:
         return {}
 
     if isinstance(parsed, list):
         if len(parsed) > 0 and isinstance(parsed[0], dict):
             return parsed[0]
-        else:
-            return {}
+        return {}
 
     if isinstance(parsed, dict):
         return parsed
 
-    return {}  # fallback
+    return {}  
 
 
 # ----------------------------
@@ -43,7 +39,6 @@ def voice_note_ui():
         st.warning("No patients found. Add a patient first in Patient Records.")
         return
 
-    # patient selector
     options = [f"{p['id']} — {p['name']}" for p in patients]
     selected = st.selectbox("Select patient to update", options)
     pid = int(selected.split(" — ")[0])
@@ -57,9 +52,7 @@ def voice_note_ui():
 
     col1, col2 = st.columns(2)
 
-    # ----------------------------
     # MICROPHONE
-    # ----------------------------
     with col1:
         if st.button("Record from Microphone (short)"):
             st.info("Recording... speak now")
@@ -68,9 +61,7 @@ def voice_note_ui():
             st.write(transcript)
             parsed = extract_rom_data(transcript)
 
-    # ----------------------------
-    # UPLOAD OR PASTED TEXT
-    # ----------------------------
+    # UPLOAD OR TEXT PASTE
     with col2:
         if st.button("Transcribe Upload / Paste"):
             if uploaded:
@@ -85,28 +76,21 @@ def voice_note_ui():
             st.write(transcript)
             parsed = extract_rom_data(transcript)
 
-    # STOP if nothing parsed
     if parsed is None:
         return
 
-    # --------------------------------
-    # FIX: ALWAYS ENSURE parsed IS A DICT
-    # --------------------------------
     parsed = normalize_parsed(parsed)
 
     st.subheader("Parsed Values (suggested)")
     st.json(parsed)
 
-    # --------------------------------
-    # BUILD PATIENT UPDATE FIELDS
-    # --------------------------------
     updates = {}
 
-    # Pain
+    # PAIN
     if parsed.get("pain_level") is not None:
         updates["pain_level"] = parsed["pain_level"]
 
-    # Swelling
+    # SWELLING
     if parsed.get("swelling") is not None:
         swelling_data = parsed["swelling"]
         if isinstance(swelling_data, dict):
@@ -114,40 +98,38 @@ def voice_note_ui():
             if swelling_data.get("location"):
                 updates["swelling_location"] = swelling_data["location"]
 
-    # ROM
-    # --- ROM ---
-if parsed.get("rom"):
-    patient = get_patient(pid)
+   
+    if parsed.get("rom"):
+        patient = get_patient(pid)
 
-    # Load existing latest ROM (for quick view)
-    rom_entries = []
-    if patient and patient.get("rom_entries"):
-        try:
-            rom_entries = json.loads(patient["rom_entries"])
-        except:
-            rom_entries = []
+        rom_entries = []
+        if patient and patient.get("rom_entries"):
+            try:
+                rom_entries = json.loads(patient["rom_entries"])
+            except:
+                rom_entries = []
 
-    # Save each parsed ROM entry
-    for item in parsed["rom"]:
-        rom_type = item["rom_type"]
-        start_val = item["start"]
-        end_val = item["end"]
+        for item in parsed["rom"]:
+            rom_type = item["rom_type"]
+            start_val = item["start"]
+            end_val = item["end"]
 
-        # 1. Save in patient.latest ROM
-        rom_entries.append({
-            "joint": rom_type,
-            "start": start_val,
-            "end": end_val
-        })
+            rom_entries.append({
+                "joint": rom_type,
+                "start": start_val,
+                "end": end_val
+            })
 
-        # 2. Save to rom_progress table
-        add_rom_progress(pid, rom_type, start_val, end_val)
+            add_rom_progress(pid, rom_type, start_val, end_val)
 
-    updates["rom_entries"] = json.dumps(rom_entries)
+        updates["rom_entries"] = json.dumps(rom_entries)
 
-    # Strength
+    # --------------------------------
+    # STRENGTH SAVING
+    # --------------------------------
     if parsed.get("strength"):
         patient = get_patient(pid)
+
         strength_entries = []
         if patient and patient.get("strength_entries"):
             try:
@@ -156,16 +138,17 @@ if parsed.get("rom"):
                 strength_entries = []
 
         for s in parsed["strength"]:
-            strength_entries.append({"muscle_group": s[0], "grade": s[1]})
+            strength_entries.append({
+                "muscle_group": s[0],
+                "grade": s[1]
+            })
 
-        updates["strength_entries"] = strength_entries
+        updates["strength_entries"] = json.dumps(strength_entries)
 
     st.markdown("**Suggested updates:**")
     st.write(updates)
 
-    # --------------------------------
-    # APPLY BUTTON
-    # --------------------------------
+    # APPLY UPDATES
     if st.button("Apply suggested updates to patient"):
         ok = update_patient_fields(pid, updates)
         if ok:
