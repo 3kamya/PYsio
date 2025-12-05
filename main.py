@@ -163,13 +163,12 @@ elif page == "Visualisation Dashboard":
             p2 = plot_strength_progress(selected_id)
             p3 = plot_pain_trend(selected_id)
             p4 = plot_swelling_trend(selected_id)
-            p5 = plot_pain_histogram(selected_id)
-            p6 = plot_rom_vs_strength(selected_id)
-            p7 = plot_improvement_percentage(selected_id)
+            p5 = plot_rom_vs_strength(selected_id)
+            p6 = plot_improvement_percentage(selected_id)
 
             st.success("Charts generated!")
 
-            imgs = [p1, p2, p3, p4, p5, p6, p7]
+            imgs = [p1, p2, p3, p4, p5, p6]
 
             for img in imgs:
                 if img:
