@@ -94,7 +94,7 @@ def voice_note_ui():
     if parsed.get("swelling") is not None:
         swelling_data = parsed["swelling"]
         if isinstance(swelling_data, dict):
-            updates["swelling"] = "Yes" if swelling_data.get("present") else "No"
+            updates["swelling"] = "Yes" if swelling_data.get("yes") else "No"
             if swelling_data.get("location"):
                 updates["swelling_location"] = swelling_data["location"]
 
