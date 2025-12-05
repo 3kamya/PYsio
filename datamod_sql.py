@@ -3,7 +3,7 @@ import sqlite3
 import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from data_model import PatientRecord, ROMEntry, StrengthEntry
+import hashlib
 
 DB_FILE = "pysio.db"
 
@@ -13,7 +13,7 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
-    # patients table: store core patient fields, store a JSON blob for rom/strength if needed
+    # patients table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS patients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +59,7 @@ def init_db():
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
-    # sessions table: for voice-note sessions
+    # sessions table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +71,7 @@ def init_db():
         FOREIGN KEY(patient_id) REFERENCES patients(id)
     )
     """)
-    # users table for auth
+    # users table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,40 +85,28 @@ def init_db():
 
 # ---------- Patient CRUD ----------
 def add_patient_from_record(rec: Dict[str, Any]) -> int:
+    """
+    Dynamically insert a patient record based on current DB columns.
+    """
     conn = get_conn()
     cur = conn.cursor()
-    # rom_entries and strength_entries should be stored as JSON strings
-    rom_json = json.dumps(rec.get("rom_entries") or [])
-    strength_json = json.dumps(rec.get("strength_entries") or [])
-    cur.execute("""
-        INSERT INTO patients (
-            name, age, sex, surgery_date, contact, surgical_procedure,
-            pain_level, swelling, swelling_location, wound_condition, infection_signs,
-            mobility_status, bed_to_chair_transfers, bathing, dressing, toileting,
-            rom_entries, strength_entries, pain_behavior, balance_gait,
-            ice_instructions, elevation_guidelines, compression_use,
-            rom_exercises, strengthening_exercises, mobility_training,
-            home_modifications, assistive_devices, wound_care_instructions,
-            signs_to_report, medication_guidelines, assessment_date,
-            followup_pain_level, followup_swelling, rom_improvements,
-            strength_changes, functional_gains, next_visit, additional_notes
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    """, (
-        rec.get("name"), rec.get("age"), rec.get("sex"), rec.get("surgery_date"),
-        rec.get("contact"), rec.get("surgical_procedure"),
-        rec.get("pain_level"), rec.get("swelling"), rec.get("swelling_location"),
-        rec.get("wound_condition"), rec.get("infection_signs"),
-        rec.get("mobility_status"), rec.get("bed_to_chair_transfers"),
-        rec.get("bathing"), rec.get("dressing"), rec.get("toileting"),
-        rom_json, strength_json, rec.get("pain_behavior"), rec.get("balance_gait"),
-        rec.get("ice_instructions"), rec.get("elevation_guidelines"), rec.get("compression_use"),
-        rec.get("rom_exercises"), rec.get("strengthening_exercises"), rec.get("mobility_training"),
-        rec.get("home_modifications"), rec.get("assistive_devices"),
-        rec.get("wound_care_instructions"), rec.get("signs_to_report"), rec.get("medication_guidelines"),
-        rec.get("assessment_date"), rec.get("followup_pain_level"), rec.get("followup_swelling"),
-        rec.get("rom_improvements"), rec.get("strength_changes"), rec.get("functional_gains"),
-        rec.get("next_visit"), rec.get("additional_notes")
-    ))
+
+    # get current columns in patients table
+    cur.execute("PRAGMA table_info(patients)")
+    columns_info = cur.fetchall()
+    columns = [col[1] for col in columns_info if col[1] not in ("id", "created_at")]
+
+    values = []
+    for col in columns:
+        if col in ("rom_entries", "strength_entries"):
+            values.append(json.dumps(rec.get(col) or []))
+        else:
+            values.append(rec.get(col))
+
+    placeholders = ",".join(["?"] * len(columns))
+    sql = f"INSERT INTO patients ({', '.join(columns)}) VALUES ({placeholders})"
+
+    cur.execute(sql, tuple(values))
     pid = cur.lastrowid
     conn.commit()
     conn.close()
@@ -138,11 +126,10 @@ def get_patient(patient_id: int) -> Optional[Dict[str, Any]]:
     cur = conn.cursor()
     cur.execute("SELECT * FROM patients WHERE id = ?", (patient_id,))
     row = cur.fetchone()
+    conn.close()
     if not row:
-        conn.close()
         return None
     cols = [c[0] for c in cur.description]
-    conn.close()
     return dict(zip(cols, row))
 
 def find_patient_by_name(name: str) -> List[Dict[str, Any]]:
@@ -157,7 +144,6 @@ def find_patient_by_name(name: str) -> List[Dict[str, Any]]:
 def update_patient_fields(patient_id: int, updates: Dict[str, Any]) -> bool:
     conn = get_conn()
     cur = conn.cursor()
-    # Build SET clause dynamically
     keys = []
     vals = []
     for k, v in updates.items():
@@ -177,7 +163,7 @@ def update_patient_fields(patient_id: int, updates: Dict[str, Any]) -> bool:
     conn.close()
     return changed
 
-# ---------- Sessions (voice notes) ----------
+# ---------- Sessions ----------
 def add_session(patient_id: int, transcript: str, parsed: Dict[str, Any], pain_level: Optional[int] = None) -> int:
     conn = get_conn()
     cur = conn.cursor()
@@ -199,8 +185,7 @@ def get_sessions_for_patient(patient_id: int) -> List[Dict[str, Any]]:
     conn.close()
     return [dict(zip(cols, r)) for r in rows]
 
-# ---------- Users (auth) ----------
-import hashlib
+# ---------- Users ----------
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
@@ -208,7 +193,8 @@ def add_user(username: str, password: str) -> bool:
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, hash_password(password)))
+        cur.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                    (username, hash_password(password)))
         conn.commit()
         return True
     except Exception:
