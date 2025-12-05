@@ -2,7 +2,7 @@
 import streamlit as st
 from voice_module import transcribe_uploaded_file, transcribe_microphone
 from voice_parser import extract_rom_data
-from data_module import get_all_patients, find_patient_by_name, add_session, update_patient_fields, get_patient, get_sessions_for_patient
+from datamod_sql import get_all_patients, find_patient_by_name, add_session, update_patient_fields, get_patient, get_sessions_for_patient
 
 def voice_note_ui():
     st.header("Voice Notes — Transcribe & Auto-Fill")
