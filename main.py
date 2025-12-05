@@ -1,7 +1,15 @@
 import streamlit as st
 from datetime import datetime
 from ui_module import patient_form
-from analytics import analytics_dashboard
+from data_visualization import (
+    plot_rom_progress,
+    plot_strength_progress,
+    plot_pain_trend,
+    plot_swelling_trend,
+    plot_pain_histogram,
+    plot_rom_vs_strength,
+    plot_improvement_percentage
+)
 from ui_voice import voice_note_ui
 from compat_shim import (
     save_record_sql,
@@ -50,13 +58,12 @@ login_system()
 # ----------------------------------------------------
 # SIDEBAR NAVIGATION
 # ----------------------------------------------------
-st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to:", [
     "Home",
     "Add Patient",
     "View Patients",
     "Voice Notes",
-    "Analytics Dashboard",
+    "Visualisation Dashboard",   # NEW WEEK-5 MODULE
     "Export PDF",
     "Settings"
 ])
@@ -136,8 +143,37 @@ elif page == "Voice Notes":
 # ----------------------------------------------------
 # ANALYTICS PAGE (WEEK 5)
 # ----------------------------------------------------
-elif page == "Analytics Dashboard":
-    analytics_dashboard()
+# ----------------------------------------------------
+# VISUALISATION DASHBOARD (WEEK 5)
+# ----------------------------------------------------
+elif page == "Visualisation Dashboard":
+    st.title("📊 Patient Data Visualisation (Week 5)")
+
+    df = load_all_patients_sql()
+
+    if df.empty:
+        st.warning("No patients found.")
+    else:
+        selected_id = st.selectbox("Select Patient", df["patient_id"].tolist())
+
+        if st.button("Generate Visualisations"):
+            st.info("Generating visualisation charts...")
+
+            p1 = plot_rom_progress(selected_id)
+            p2 = plot_strength_progress(selected_id)
+            p3 = plot_pain_trend(selected_id)
+            p4 = plot_swelling_trend(selected_id)
+            p5 = plot_pain_histogram(selected_id)
+            p6 = plot_rom_vs_strength(selected_id)
+            p7 = plot_improvement_percentage(selected_id)
+
+            st.success("Charts generated!")
+
+            imgs = [p1, p2, p3, p4, p5, p6, p7]
+
+            for img in imgs:
+                if img:
+                    st.image(img, caption=img, use_column_width=True)
 
 
 # ----------------------------------------------------
