@@ -21,6 +21,29 @@ from compat_shim import (
     extract_structured_keywords,
     add_session
 )
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+from ui_module import patient_form
+
+# --- UPDATED IMPORTS: ONLY importing the two remaining functions ---
+from data_visualisation import (
+    plot_strength_progress, 
+    plot_pain_trend
+)
+# ------------------------------------------------------------------
+
+from ui_voice import voice_note_ui
+from compat_shim import (
+    save_record_sql,
+    load_all_patients_sql,
+    load_single_patient_sql,
+    generate_patient_pdf,
+    convert_voice_to_text,
+    extract_structured_keywords,
+    add_session,
+    get_sessions_for_patient # Ensure this is here for the View Patients section
+)
 
 
 # ----------------------------------------------------
@@ -62,7 +85,7 @@ login_system()
 # ----------------------------------------------------
 page = st.sidebar.radio("Go to:", [
     "Home",
-    "Add / Update Patient Session",   # <-- changed
+    "Add / Update Patient Session",    # <-- changed
     "View Patients",
     "Voice Notes",
     "Visualisation Dashboard",
@@ -104,9 +127,6 @@ elif page == "Add Patient":
 # ----------------------------------------------------
 # VIEW PATIENTS PAGE
 # ----------------------------------------------------
-# ----------------------------------------------------
-# VIEW PATIENTS PAGE
-# ----------------------------------------------------
 elif page == "View Patients":
     st.title("All Patients")
 
@@ -121,9 +141,9 @@ elif page == "View Patients":
 
         if st.button("Load Patient"):
             
-           
             patient_data = load_single_patient_sql(picked_id)
-            sessions = get_sessions_for_patient(int(picked_id)) # Get sessions using the integer ID
+            # Use get_sessions_for_patient function
+            sessions = get_sessions_for_patient(int(picked_id)) 
             
             st.subheader(f"Patient Record: ID {picked_id}")
             st.json(patient_data)
@@ -144,7 +164,6 @@ elif page == "View Patients":
                 
             else:
                 st.info("No session history found for this patient.")
-            # --- NEW CODE END ---
 
 # ----------------------------------------------------
 # VOICE NOTES PAGE
@@ -169,13 +188,10 @@ elif page == "Voice Notes":
 
 
 # ----------------------------------------------------
-# ANALYTICS PAGE (WEEK 5)
-# ----------------------------------------------------
-# ----------------------------------------------------
-# VISUALISATION DASHBOARD (WEEK 5)
+# VISUALISATION DASHBOARD
 # ----------------------------------------------------
 elif page == "Visualisation Dashboard":
-    st.title("📊 Patient Data Visualisation (Week 5)")
+    st.title("📊 Patient Data Visualisation")
 
     df = load_all_patients_sql()
 
@@ -185,18 +201,16 @@ elif page == "Visualisation Dashboard":
         selected_id = st.selectbox("Select Patient", df["patient_id"].tolist())
 
         if st.button("Generate Visualisations"):
-            st.info("Generating visualisation charts...")
+            st.info("Generating visualisation charts for Pain and Strength...")
 
-            p1 = plot_rom_progress(selected_id)
-            p2 = plot_strength_progress(selected_id)
-            p3 = plot_pain_trend(selected_id)
-            p4 = plot_swelling_trend(selected_id)
-            p5 = plot_rom_vs_strength(selected_id)
-            p6 = plot_improvement_percentage(selected_id)
+            # --- ONLY calling the two existing functions ---
+            p1 = plot_strength_progress(selected_id)
+            p2 = plot_pain_trend(selected_id)
 
             st.success("Charts generated!")
 
-            imgs = [p1, p2, p3, p4, p5, p6]
+            # --- ONLY including the two existing paths ---
+            imgs = [p1, p2] 
 
             for img in imgs:
                 if img:
