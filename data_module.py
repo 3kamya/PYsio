@@ -1,4 +1,4 @@
-import csv
+'''import csv
 import os
 from data_model import PatientRecord
 
@@ -45,7 +45,7 @@ def save_record(record: PatientRecord):
 
 def load_records():
     if not os.path.isfile(CSV_FILE):
-        return []
+        return []'''
 
     with open(CSV_FILE, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
