@@ -1,21 +1,21 @@
-# pdf_export.py
 from fpdf import FPDF
 from typing import Dict, Any, List
 import json
 from datetime import datetime
+import os # Added os for cleanup
 
-# Import all chart-generation functions
+# Import only the active chart-generation functions
 from data_visualisation import (
-    plot_rom_progress,
     plot_strength_progress,
-    plot_pain_trend,
-    plot_swelling_trend,
-    plot_rom_vs_strength,
-    plot_improvement_percentage
+    plot_pain_trend
 )
 
 
 def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], out_path: str):
+    """
+    Creates a comprehensive PDF summary for a patient, including their details,
+    session history, and key progress charts (Pain and Strength).
+    """
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -43,63 +43,60 @@ def create_patient_pdf(patient: Dict[str, Any], sessions: List[Dict[str, Any]], 
     if not sessions:
         pdf.cell(0, 6, "No sessions recorded.", ln=1)
     else:
+        # Display up to 10 recent sessions
         for s in sessions[:10]:
+            # Convert timestamp to a readable format if necessary
             created = s.get("created_at", "")
-            pdf.multi_cell(0, 6, f"- {created}: {s.get('transcript')}")
             
-            parsed = s.get("parsed_json")
-            if parsed:
-                try:
-                    parsed_obj = json.loads(parsed)
-                except:
-                    parsed_obj = parsed
-                pdf.set_font("Arial", size=10)
-                pdf.multi_cell(0, 5, f"  Parsed: {parsed_obj}")
-                pdf.set_font("Arial", size=11)
+            # Use 'transcript' if available, otherwise just note the session date
+            transcript_text = s.get('transcript', 'Manual session entry.')
+            if len(transcript_text) > 80:
+                 transcript_text = transcript_text[:77] + "..." # Truncate long notes
 
-            pdf.ln(1)
+            pdf.multi_cell(0, 6, f"Session Date: {created}\nNote: {transcript_text}")
+            
+            # Display pain level if available
+            if s.get("pain_level"):
+                pdf.set_font("Arial", size=10, style="I")
+                pdf.cell(0, 5, f"  Pain Level: {s['pain_level']}", ln=1)
+                pdf.set_font("Arial", size=11)
+            
+            pdf.ln(1) # Small space between sessions
 
     pdf.ln(6)
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 8,
-             f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-             ln=1)
+              f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+              ln=1)
 
     # -------------------------------
-    # Generate all charts
+    # Generate and Insert Charts
     # -------------------------------
     chart_paths = []
 
-    rom_path = plot_rom_progress(patient["patient_id"])
-    if rom_path: chart_paths.append(("ROM Progress", rom_path))
-
-    strength_path = plot_strength_progress(patient["patient_id"])
-    if strength_path: chart_paths.append(("Strength Progress", strength_path))
-
+    # 1. Pain Trend Plot
     pain_path = plot_pain_trend(patient["patient_id"])
-    if pain_path: chart_paths.append(("Pain Trend", pain_path))
+    if pain_path: chart_paths.append(("Pain Trend Over Sessions", pain_path))
 
-    swelling_path = plot_swelling_trend(patient["patient_id"])
-    if swelling_path: chart_paths.append(("Swelling Trend", swelling_path))
+    # 2. Strength Progress Plot
+    strength_path = plot_strength_progress(patient["patient_id"])
+    if strength_path: chart_paths.append(("Strength Progress Over Sessions", strength_path))
 
-    hist_path = plot_pain_histogram(patient["patient_id"])
-    if hist_path: chart_paths.append(("Pain Histogram", hist_path))
-
-    scatter_path = plot_rom_vs_strength(patient["patient_id"])
-    if scatter_path: chart_paths.append(("ROM vs Strength", scatter_path))
-
-    improve_path = plot_improvement_percentage(patient["patient_id"])
-    if improve_path: chart_paths.append(("Recovery Percentage", improve_path))
-
-    # -------------------------------
-    # Insert charts into PDF
-    # -------------------------------
+    
+    # Insert charts into PDF and clean up files
     for title, img_path in chart_paths:
         pdf.add_page()
         pdf.set_font("Arial", 'B', 14)
         pdf.cell(0, 10, title, ln=1)
+        # Use w=180 to fit the chart nicely on an A4 page
         pdf.image(img_path, x=15, y=None, w=180)
+        
+        # Clean up the generated image file immediately after insertion
+        try:
+            os.remove(img_path)
+        except OSError as e:
+            print(f"Error removing temporary chart file {img_path}: {e}")
 
+    # Final output
     pdf.output(out_path)
     return out_path
-
