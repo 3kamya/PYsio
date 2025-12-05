@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from datetime import datetime
 from ui_module import patient_form
 from data_visualisation import (
@@ -103,6 +104,9 @@ elif page == "Add Patient":
 # ----------------------------------------------------
 # VIEW PATIENTS PAGE
 # ----------------------------------------------------
+# ----------------------------------------------------
+# VIEW PATIENTS PAGE
+# ----------------------------------------------------
 elif page == "View Patients":
     st.title("All Patients")
 
@@ -116,9 +120,31 @@ elif page == "View Patients":
         picked_id = st.selectbox("Select Patient ID", patient_ids)
 
         if st.button("Load Patient"):
+            
+           
             patient_data = load_single_patient_sql(picked_id)
-            st.write(patient_data)
-
+            sessions = get_sessions_for_patient(int(picked_id)) # Get sessions using the integer ID
+            
+            st.subheader(f"Patient Record: ID {picked_id}")
+            st.json(patient_data)
+            
+            st.subheader("Session History")
+            
+            if sessions:
+                # Convert the sessions list of dicts to a DataFrame for clean display
+                sessions_df = pd.DataFrame(sessions)
+                
+                # Format the DataFrame to make it readable (optional but recommended)
+                # Drop long JSON fields for cleaner table view
+                sessions_df = sessions_df.drop(columns=['parsed_data'], errors='ignore')
+                sessions_df['timestamp'] = pd.to_datetime(sessions_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M')
+                sessions_df = sessions_df.rename(columns={'timestamp': 'Date/Time'})
+                
+                st.dataframe(sessions_df)
+                
+            else:
+                st.info("No session history found for this patient.")
+            # --- NEW CODE END ---
 
 # ----------------------------------------------------
 # VOICE NOTES PAGE
