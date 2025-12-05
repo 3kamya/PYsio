@@ -63,7 +63,6 @@ def load_patient_records(patient_id):
     def extract_mobility(p):
         status_list = p.get("mobility_status")
         if status_list:
-            # map mobility status to numbers for plotting
             mapping = {"Poor": 1, "Limited": 2, "Normal": 3, "Excellent": 4}
             return mapping.get(status_list[0], None)
         return None
@@ -84,7 +83,6 @@ def plot_rom_progress(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["rom"].isna().all():
         return None
-
     plt.figure()
     plt.plot(df["created_at"], df["rom"], marker='o')
     plt.xlabel("Session Date")
@@ -101,7 +99,6 @@ def plot_strength_progress(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["strength"].isna().all():
         return None
-
     plt.figure()
     plt.plot(df["created_at"], df["strength"], marker='o')
     plt.xlabel("Session Date")
@@ -118,7 +115,6 @@ def plot_pain_trend(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["pain_level"].isna().all():
         return None
-
     plt.figure()
     plt.plot(df["created_at"], df["pain_level"], marker='o')
     plt.xlabel("Session Date")
@@ -131,11 +127,27 @@ def plot_pain_trend(patient_id):
     plt.close()
     return path
 
+# ------------------ restore histogram ------------------
+def plot_pain_histogram(patient_id):
+    df = load_patient_records(patient_id)
+    if df.empty or df["pain_level"].isna().all():
+        return None
+    plt.figure()
+    plt.hist(df["pain_level"])
+    plt.xlabel("Pain Level")
+    plt.ylabel("Frequency")
+    plt.title("Pain Level Distribution")
+    plt.tight_layout()
+    path = f"pain_hist_{patient_id}.png"
+    plt.savefig(path)
+    plt.close()
+    return path
+# ---------------------------------------------------------
+
 def plot_swelling_trend(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["swelling"].isna().all():
         return None
-
     plt.figure()
     plt.plot(df["created_at"], df["swelling"], marker='o')
     plt.xlabel("Session Date")
@@ -152,12 +164,11 @@ def plot_infection_trend(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["infection_count"].isna().all():
         return None
-
     plt.figure()
     plt.bar(df["created_at"], df["infection_count"])
     plt.xlabel("Session Date")
     plt.ylabel("Number of Infection Signs")
-    plt.title("Infection Signs Trend")
+    plt.title("Infection Trend")
     plt.xticks(rotation=45)
     plt.tight_layout()
     path = f"infection_trend_{patient_id}.png"
@@ -169,7 +180,6 @@ def plot_mobility_trend(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["mobility"].isna().all():
         return None
-
     plt.figure()
     plt.plot(df["created_at"], df["mobility"], marker='o')
     plt.xlabel("Session Date")
@@ -186,7 +196,6 @@ def plot_rom_vs_strength(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df["rom"].isna().all() or df["strength"].isna().all():
         return None
-
     plt.figure()
     plt.scatter(df["rom"], df["strength"])
     plt.xlabel("ROM (deg)")
@@ -202,7 +211,6 @@ def plot_improvement_percentage(patient_id):
     df = load_patient_records(patient_id)
     if df.empty or df.shape[0] < 2:
         return None
-
     try:
         rom_change = ((df["rom"].iloc[-1] - df["rom"].iloc[0]) / df["rom"].iloc[0]) * 100
     except:
@@ -215,10 +223,8 @@ def plot_improvement_percentage(patient_id):
         pain_change = -((df["pain_level"].iloc[-1] - df["pain_level"].iloc[0]) / df["pain_level"].iloc[0]) * 100
     except:
         pain_change = 0
-
     labels = ["ROM %", "Strength %", "Pain %"]
     values = [rom_change, strength_change, pain_change]
-
     plt.figure()
     plt.bar(labels, values)
     plt.ylabel("Improvement (%)")
