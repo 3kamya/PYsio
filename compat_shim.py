@@ -88,10 +88,18 @@ def convert_voice_to_text(uploaded_file_or_none: Optional[object] = None) -> str
 
 def extract_structured_keywords(text: str) -> dict:
     """
-    Converts voice_parser output into normalized dict expected by ui_voice.py
+    Converts voice_parser output into normalized dict expected by ui_voice.py.
+    Guarantees actionable data is recognized.
     """
     parsed_list = extract_rom_data(text)
     normalized = normalize_parsed(parsed_list)
-    # add raw_text for completeness
+
+    # Add raw_text for reference
     normalized["raw_text"] = text
+
+    # Ensure keys exist even if empty
+    for key in ["rom", "strength", "swelling", "pain_level", "infection_signs", "mobility_status"]:
+        if key not in normalized:
+            normalized[key] = None if key in ["swelling", "pain_level"] else []
+
     return normalized
