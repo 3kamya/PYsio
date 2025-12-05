@@ -102,8 +102,49 @@ def convert_voice_to_text(uploaded_file_or_none: Optional[object] = None) -> str
 
 def extract_structured_keywords(text: str) -> dict:
     """
-    Shallow wrapper so main.py's name exists.
-    We reuse extract_rom_data from voice_parser and wrap its output into a dict.
+    Converts voice_parser output into the structure main.py expects.
     """
-    rom_list = extract_rom_data(text)
-    return {"rom": rom_list, "raw_text": text}
+    parsed_list = extract_rom_data(text)
+
+    result = {
+        "rom_entries": [],
+        "strength_entries": [],
+        "swelling": None,
+        "pain_level": None,
+        "infection_signs": [],
+        "mobility_status": None,
+        "raw_text": text
+    }
+
+    for entry in parsed_list:
+        typ = entry.get("type")
+        if typ == "rom":
+            # main.py expects a JSON string with "joint", "start", "end"
+            result["rom_entries"].append({
+                "joint": entry.get("rom_type"),
+                "start": entry.get("start"),
+                "end": entry.get("end")
+            })
+        elif typ == "pain_level":
+            result["pain_level"] = entry.get("pain_level")
+        elif typ == "swelling":
+            result["swelling"] = entry.get("present")
+        elif typ == "infection_signs":
+            result["infection_signs"] = entry.get("signs", [])
+        elif typ == "mobility_status":
+            result["mobility_status"] = entry.get("status")
+        elif typ == "strength":
+            result["strength_entries"].append({
+                "muscle": entry.get("muscle"),
+                "grade": entry.get("grade")
+            })
+
+    # Convert lists to JSON strings if main.py expects that
+    if result["rom_entries"]:
+        import json
+        result["rom_entries"] = json.dumps(result["rom_entries"])
+    if result["strength_entries"]:
+        import json
+        result["strength_entries"] = json.dumps(result["strength_entries"])
+
+    return result
