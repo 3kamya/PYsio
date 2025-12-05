@@ -1,4 +1,4 @@
-'''#import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import sqlite3
 import pandas as pd
 import json
@@ -206,4 +206,4 @@ def plot_improvement_percentage(patient_id):
     path = f"recovery_percent_{patient_id}.png"
     plt.savefig(path)
     plt.close()
-    return path'''
+    return path
