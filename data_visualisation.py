@@ -4,7 +4,7 @@ import pandas as pd
 import json
 from datetime import datetime
 
-DB_PATH = "pysio.db"   # << change this if your DB file has another name
+DB_PATH = "pysio.db"   
 
 # -----------------------------
 # DATABASE CONNECTION FUNCTION
