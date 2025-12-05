@@ -1,8 +1,8 @@
+# voice_parser.py
 import re
 
 # -----------------------------
-# ROM keywords your system can understand
-# Add or modify as needed
+# Keywords / phrases your system can understand
 # -----------------------------
 ROM_KEYWORDS = {
     "knee flexion": "knee_flexion",
@@ -17,9 +17,20 @@ ROM_KEYWORDS = {
     "elbow extension": "elbow_extension"
 }
 
+# Swelling keywords
+SWELLING_KEYWORDS = ["swelling", "edema", "effusion"]
+
+# Pain keywords
+PAIN_KEYWORDS = ["pain", "ache", "discomfort", "soreness"]
+
+# Infection / signs
+INFECTION_KEYWORDS = ["redness", "pus", "infection", "warmth"]
+
+# Mobility / status
+MOBILITY_KEYWORDS = ["walk", "mobility", "stand", "sit", "climb", "move"]
 
 # -----------------------------
-# Helper function — find which ROM term is present in the sentence
+# Helper functions
 # -----------------------------
 def detect_rom_type(text):
     text = text.lower()
@@ -28,82 +39,107 @@ def detect_rom_type(text):
             return ROM_KEYWORDS[keyword], keyword
     return None, None
 
+def contains_keyword(text, keywords):
+    text = text.lower()
+    for kw in keywords:
+        if kw in text:
+            return kw
+    return None
 
 # -----------------------------
 # Main extraction function
 # -----------------------------
 def extract_rom_data(transcript):
     transcript = transcript.lower()
-
     results = []
 
-    # Split transcript into sentences for easier parsing
     sentences = re.split(r'[.,;]', transcript)
-
     for sentence in sentences:
         sentence = sentence.strip()
         if not sentence:
             continue
 
-        #  Find ROM type in the sentence
+        entry = {}
+
+        # -----------------------------
+        # ROM extraction
+        # -----------------------------
         rom_code, rom_phrase = detect_rom_type(sentence)
-        if not rom_code:
+        if rom_code:
+            entry["type"] = "rom"
+            entry["rom_type"] = rom_code
+            entry["rom_phrase"] = rom_phrase
+
+            # Patterns
+            match_range = re.search(r'from\s+(\d+)\s+to\s+(\d+)\s*degrees?', sentence)
+            match_around = re.search(r'around\s+(\d+)\s*degrees?', sentence)
+            match_improve = re.search(r"(improved|increased|reduced).*?(\d+)\s*degrees?", sentence)
+            match_single = re.search(r'(\d+)\s*degrees?', sentence)
+
+            if match_range:
+                entry["start"] = int(match_range.group(1))
+                entry["end"] = int(match_range.group(2))
+            elif match_around:
+                entry["start"] = None
+                entry["end"] = int(match_around.group(1))
+            elif match_improve:
+                entry["start"] = None
+                entry["end"] = int(match_improve.group(2))
+            elif match_single:
+                entry["start"] = None
+                entry["end"] = int(match_single.group(1))
+            else:
+                entry["start"] = None
+                entry["end"] = None
+
+            results.append(entry)
+            continue  # skip other checks if ROM found
+
+        # -----------------------------
+        # Swelling extraction
+        # -----------------------------
+        if contains_keyword(sentence, SWELLING_KEYWORDS):
+            entry["type"] = "swelling"
+            entry["present"] = True
+            match_amount = re.search(r'(\d+)\s*(cm|centimeters?)', sentence)
+            if match_amount:
+                entry["amount"] = int(match_amount.group(1))
+                entry["unit"] = "cm"
+            results.append(entry)
             continue
 
-        #  Pattern: "from X to Y degrees"
-        match_range = re.search(r'from\s+(\d+)\s+to\s+(\d+)\s*degrees?', sentence)
-        if match_range:
-            start_val = int(match_range.group(1))
-            end_val = int(match_range.group(2))
-            results.append({
-                "rom_type": rom_code,
-                "rom_phrase": rom_phrase,
-                "start": start_val,
-                "end": end_val
-            })
+        # -----------------------------
+        # Pain level extraction
+        # -----------------------------
+        if contains_keyword(sentence, PAIN_KEYWORDS):
+            entry["type"] = "pain_level"
+            match_val = re.search(r'(\d+)\s*(/10)?', sentence)
+            if match_val:
+                entry["pain_level"] = int(match_val.group(1))
+            else:
+                entry["pain_level"] = None
+            results.append(entry)
             continue
 
-        #  Pattern: "around X degrees"
-        match_around = re.search(r'around\s+(\d+)\s*degrees?', sentence)
-        if match_around:
-            val = int(match_around.group(1))
-            results.append({
-                "rom_type": rom_code,
-                "rom_phrase": rom_phrase,
-                "start": None,
-                "end": val
-            })
+        # -----------------------------
+        # Signs of infection
+        # -----------------------------
+        if contains_keyword(sentence, INFECTION_KEYWORDS):
+            entry["type"] = "infection_signs"
+            entry["signs"] = [kw for kw in INFECTION_KEYWORDS if kw in sentence]
+            results.append(entry)
             continue
 
-        # Pattern: "improved / increased / reduced ... X degrees"
-        match_improve = re.search(
-            r"(improved|increased|reduced).*?(\d+)\s*degrees?",
-            sentence
-        )
-        if match_improve:
-            val = int(match_improve.group(2))
-            results.append({
-                "rom_type": rom_code,
-                "rom_phrase": rom_phrase,
-                "start": None,
-                "end": val
-            })
-            continue
-
-        # Simple pattern: "X degrees"
-        match_single = re.search(r'(\d+)\s*degrees?', sentence)
-        if match_single:
-            val = int(match_single.group(1))
-            results.append({
-                "rom_type": rom_code,
-                "rom_phrase": rom_phrase,
-                "start": None,
-                "end": val
-            })
+        # -----------------------------
+        # Mobility status
+        # -----------------------------
+        if contains_keyword(sentence, MOBILITY_KEYWORDS):
+            entry["type"] = "mobility_status"
+            entry["status"] = sentence
+            results.append(entry)
             continue
 
     return results
-
 
 # -----------------------------
 # Test locally
@@ -112,7 +148,12 @@ if __name__ == "__main__":
     sample = """
     Knee flexion improved from 30 to 45 degrees today.
     External rotation is still limited, around 20 degrees.
+    Swelling around knee is 2 cm.
+    Pain is 4/10.
+    Some redness and pus observed.
+    Patient can walk with slight limp.
     Shoulder abduction is about 80 degrees.
     """
 
-    print(extract_rom_data(sample))
+    import json
+    print(json.dumps(extract_rom_data(sample), indent=4))
