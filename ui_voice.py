@@ -1,5 +1,5 @@
 # ui_voice.py
-# ui_voice.py (patched)
+# ui_voice.py
 import streamlit as st
 import json
 from voice_module import transcribe_uploaded_file, transcribe_microphone
@@ -94,7 +94,20 @@ def voice_note_ui():
 
     parsed = normalize_parsed(parsed)
 
-    if not any(parsed.values()):
+    # ----------------------------
+    # CHECK FOR ANY ACTIONABLE DATA
+    # ----------------------------
+    def has_actionable_data(parsed_dict):
+        return any([
+            parsed_dict.get("pain_level") is not None,
+            parsed_dict.get("swelling") is not None,
+            parsed_dict.get("rom"),
+            parsed_dict.get("strength"),
+            parsed_dict.get("infection_signs"),
+            parsed_dict.get("mobility_status")
+        ])
+
+    if not has_actionable_data(parsed):
         st.info("No actionable data parsed from transcript.")
         return
 
