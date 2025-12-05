@@ -1,32 +1,27 @@
 # ui_voice.py
-
 import streamlit as st
 import json
 from voice_module import transcribe_uploaded_file, transcribe_microphone
 from voice_parser import extract_rom_data
 from datamod_sql import (
-    get_all_patients, find_patient_by_name, add_session,
-    update_patient_fields, get_patient, get_sessions_for_patient,
-    add_rom_progress
+    get_all_patients, get_patient, add_session,
+    update_patient_fields
 )
 
 # ----------------------------
 # FIX: Normalize parsed output
 # ----------------------------
 def normalize_parsed(parsed):
+    """
+    Ensure parsed is always a list of dicts.
+    """
     if parsed is None:
-        return {}
-
-    if isinstance(parsed, list):
-        if len(parsed) > 0 and isinstance(parsed[0], dict):
-            return parsed[0]
-        return {}
-
+        return []
     if isinstance(parsed, dict):
-        return parsed
-
-    return {}  
-
+        return [parsed]
+    if isinstance(parsed, list):
+        return [p for p in parsed if isinstance(p, dict)]
+    return []
 
 # ----------------------------
 # MAIN UI FUNCTION
@@ -39,6 +34,7 @@ def voice_note_ui():
         st.warning("No patients found. Add a patient first in Patient Records.")
         return
 
+    # Patient selector
     options = [f"{p['id']} — {p['name']}" for p in patients]
     selected = st.selectbox("Select patient to update", options)
     pid = int(selected.split(" — ")[0])
@@ -47,12 +43,14 @@ def voice_note_ui():
     uploaded = st.file_uploader("Upload audio (wav/mp3)", type=["wav", "mp3", "m4a"])
     manual_text = st.text_area("Or paste transcript here")
 
-    parsed = None
+    parsed = []
     transcript = ""
 
     col1, col2 = st.columns(2)
 
+    # ----------------------------
     # MICROPHONE
+    # ----------------------------
     with col1:
         if st.button("Record from Microphone (short)"):
             st.info("Recording... speak now")
@@ -61,7 +59,9 @@ def voice_note_ui():
             st.write(transcript)
             parsed = extract_rom_data(transcript)
 
-    # UPLOAD OR TEXT PASTE
+    # ----------------------------
+    # UPLOAD OR PASTED TEXT
+    # ----------------------------
     with col2:
         if st.button("Transcribe Upload / Paste"):
             if uploaded:
@@ -76,83 +76,86 @@ def voice_note_ui():
             st.write(transcript)
             parsed = extract_rom_data(transcript)
 
-    if parsed is None:
-        return
-
     parsed = normalize_parsed(parsed)
+
+    if not parsed:
+        st.info("No actionable data parsed from transcript.")
+        return
 
     st.subheader("Parsed Values (suggested)")
     st.json(parsed)
 
+    # ----------------------------
+    # BUILD PATIENT UPDATE FIELDS
+    # ----------------------------
     updates = {}
+    rom_entries = []
+    strength_entries = []
+    swelling = None
+    pain_level = None
+    infection_signs = []
+    mobility_status = []
 
-    # PAIN
-    if parsed.get("pain_level") is not None:
-        updates["pain_level"] = parsed["pain_level"]
-
-    # SWELLING
-    if parsed.get("swelling") is not None:
-        swelling_data = parsed["swelling"]
-        if isinstance(swelling_data, dict):
-            updates["swelling"] = "Yes" if swelling_data.get("yes") else "No"
-            if swelling_data.get("location"):
-                updates["swelling_location"] = swelling_data["location"]
-
-   
-    if parsed.get("rom"):
-        patient = get_patient(pid)
-
-        rom_entries = []
-        if patient and patient.get("rom_entries"):
+    # Load existing patient data
+    patient = get_patient(pid)
+    if patient:
+        if patient.get("rom_entries"):
             try:
                 rom_entries = json.loads(patient["rom_entries"])
             except:
                 rom_entries = []
-
-        for item in parsed["rom"]:
-            rom_type = item["rom_type"]
-            start_val = item["start"]
-            end_val = item["end"]
-
-            rom_entries.append({
-                "joint": rom_type,
-                "start": start_val,
-                "end": end_val
-            })
-
-            add_rom_progress(pid, rom_type, start_val, end_val)
-
-        updates["rom_entries"] = json.dumps(rom_entries)
-
-    # --------------------------------
-    # STRENGTH SAVING
-    # --------------------------------
-    if parsed.get("strength"):
-        patient = get_patient(pid)
-
-        strength_entries = []
-        if patient and patient.get("strength_entries"):
+        if patient.get("strength_entries"):
             try:
                 strength_entries = json.loads(patient["strength_entries"])
             except:
                 strength_entries = []
 
-        for s in parsed["strength"]:
-            strength_entries.append({
-                "muscle_group": s[0],
-                "grade": s[1]
+    # Parse each entry from the parser
+    for item in parsed:
+        if item.get("type") == "rom":
+            rom_entries.append({
+                "joint": item.get("rom_type"),
+                "start": item.get("start"),
+                "end": item.get("end")
             })
+        elif item.get("type") == "strength":
+            strength_entries.append({
+                "muscle_group": item.get("muscle_group"),
+                "grade": item.get("grade")
+            })
+        elif item.get("type") == "swelling":
+            swelling = item.get("present")
+        elif item.get("type") == "pain_level":
+            pain_level = item.get("pain_level")
+        elif item.get("type") == "infection_signs":
+            infection_signs.extend(item.get("signs", []))
+        elif item.get("type") == "mobility_status":
+            mobility_status.append(item.get("status"))
 
+    # Build updates dict
+    if rom_entries:
+        updates["rom_entries"] = json.dumps(rom_entries)
+    if strength_entries:
         updates["strength_entries"] = json.dumps(strength_entries)
+    if swelling is not None:
+        updates["swelling"] = "Yes" if swelling else "No"
+    if pain_level is not None:
+        updates["pain_level"] = pain_level
+    if infection_signs:
+        updates["infection_signs"] = json.dumps(infection_signs)
+    if mobility_status:
+        updates["mobility_status"] = json.dumps(mobility_status)
 
     st.markdown("**Suggested updates:**")
     st.write(updates)
 
-    # APPLY UPDATES
+    # ----------------------------
+    # APPLY BUTTON
+    # ----------------------------
     if st.button("Apply suggested updates to patient"):
         ok = update_patient_fields(pid, updates)
         if ok:
-            add_session(pid, transcript, parsed, parsed.get("pain_level"))
+            add_session(pid, transcript, parsed, pain_level)
             st.success("Patient record updated and session saved.")
         else:
             st.error("Failed to update patient.")
