@@ -174,6 +174,49 @@ elif page == "Visualisation Dashboard":
                 if img:
                     st.image(img, caption=img, use_column_width=True)
 
+# ----------------------------------------------------
+# ADD / UPDATE PATIENT SESSION PAGE
+# ----------------------------------------------------
+elif page == "Add / Update Patient Session":
+    st.title("Add / Update Patient Session")
+
+    # Load existing patients
+    df = load_all_patients_sql()
+    if df.empty:
+        st.warning("No patients found. Please add a new patient first.")
+        record = patient_form()
+        if record:
+            save_record_sql(record)
+            st.success("Patient record saved successfully!")
+    else:
+        patient_ids = df["patient_id"].tolist()
+        selected_id = st.selectbox("Select Patient", patient_ids)
+
+        # Option to create a new patient instead
+        if st.checkbox("Create a new patient instead"):
+            record = patient_form()
+            if record:
+                save_record_sql(record)
+                st.success("New patient record saved!")
+        else:
+            st.info("Fill out the session details for this patient.")
+
+            # Show the patient form
+            session_record = patient_form()
+            if session_record:
+                # Remove patient_id so we don't overwrite the original patient
+                session_record.pop("patient_id", None)
+
+                # Add as a new session
+                add_session(
+                    int(selected_id),        # patient id
+                    transcript="",           # no voice transcript
+                    parsed=session_record,   # the manual form data
+                    pain_level=session_record.get("pain_level")
+                )
+                st.success("Session added for existing patient!")
+
+
 
 # ----------------------------------------------------
 # PDF EXPORT PAGE
