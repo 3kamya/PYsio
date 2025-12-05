@@ -60,13 +60,14 @@ login_system()
 # ----------------------------------------------------
 page = st.sidebar.radio("Go to:", [
     "Home",
-    "Add Patient",
+    "Add / Update Patient Session",   # <-- changed
     "View Patients",
     "Voice Notes",
-    "Visualisation Dashboard",   # NEW WEEK-5 MODULE
+    "Visualisation Dashboard",
     "Export PDF",
     "Settings"
 ])
+
 
 
 # ----------------------------------------------------
