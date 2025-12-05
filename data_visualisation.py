@@ -4,22 +4,30 @@ import pandas as pd
 import json
 from datetime import datetime
 
+# Define the database path
 DB_PATH = "pysio.db"
 
 # -----------------------------
 # DATABASE CONNECTION FUNCTION
 # -----------------------------
 def get_connection():
+    """Establishes a connection to the SQLite database."""
     return sqlite3.connect(DB_PATH)
 
 # -----------------------------
 # LOAD PATIENT RECORDS INTO DF
 # -----------------------------
 def load_patient_records(patient_id):
+    """
+    Loads all session records for a patient, parses the necessary data,
+    and returns a DataFrame suitable for visualization.
+    """
     conn = get_connection()
+    # Use Row factory to access columns by name like a dictionary
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
+    # NOTE: Assuming 'parsed_json' and 'pain_level' columns exist in the 'sessions' table.
     query = """
         SELECT created_at, parsed_json, pain_level
         FROM sessions
@@ -27,102 +35,75 @@ def load_patient_records(patient_id):
         ORDER BY created_at ASC;
     """
 
-    cur.execute(query, (patient_id,))
+    # Ensure patient_id is an integer for the query
+    cur.execute(query, (int(patient_id),))
     rows = cur.fetchall()
     conn.close()
 
-    df = pd.DataFrame(rows)
+    # Convert list of sqlite.Row objects to a list of dictionaries for robust DataFrame creation
+    data = [dict(row) for row in rows]
+    df = pd.DataFrame(data)
+
     if df.empty:
         return df
 
-    # Parse JSON field
+    # Parse JSON field. This handles the KeyError by ensuring the column is accessed correctly.
     df["parsed_json"] = df["parsed_json"].apply(
         lambda x: json.loads(x) if isinstance(x, str) else {}
     )
 
-    # Extract ROM, Strength, Swelling, Pain
-    def extract_rom(p):
-        if p.get("rom"):
-            # Take first ROM entry per session for plotting
-            return p["rom"][0]["end"]
-        return None
+    # --- Data Extraction Helpers ---
 
     def extract_strength(p):
-        if p.get("strength"):
-            return p["strength"][0][1]
+        """
+        Extracts the grade of the first strength entry.
+        FIXED: Accessing ['grade'] key instead of array index [1].
+        """
+        if p.get("strength") and p["strength"][0].get("grade") is not None:
+            # Strength is an array of dicts: [{"muscle_group": "quads", "grade": 4}]
+            return p["strength"][0]["grade"]
         return None
 
-    def extract_swelling(p):
-        s = p.get("swelling")
-        if isinstance(s, dict):
-            return 1 if s.get("present") else 0
-        return None
-
-    df["rom"] = df["parsed_json"].apply(extract_rom)
+    # Apply extraction
     df["strength"] = df["parsed_json"].apply(extract_strength)
-    df["swelling"] = df["parsed_json"].apply(extract_swelling)
-    df["pain_level"] = df["pain_level"]
 
-    # Convert created_at to datetime
-    df["created_at"] = pd.to_datetime(df["created_at"])
-    return df
+    # Clean up pain level (ensure it's numeric)
+    df["pain_level"] = pd.to_numeric(df["pain_level"], errors='coerce')
 
-# ------------------------------------------------------------
-# 1. ROM Progress Plot
-# ------------------------------------------------------------
-def plot_rom_progress(patient_id):
-    df = load_patient_records(patient_id)
-    if df.empty or df["rom"].isna().all():
-        return None
-
-    plt.figure()
-    plt.plot(df["created_at"], df["rom"], marker='o')
-    plt.xlabel("Session Date")
-    plt.ylabel("Range of Motion (deg)")
-    plt.title("ROM Progress Over Time")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    path = f"rom_progress_{patient_id}.png"
-    plt.savefig(path)
-    plt.close()
-    return path
+    # Create a simple session number index for the X-axis
+    df["session_number"] = range(1, len(df) + 1)
+    
+    return df.dropna(subset=['session_number']) # Ensure we only plot valid sessions
 
 # ------------------------------------------------------------
-# 2. Strength Progress Plot
-# ------------------------------------------------------------
-def plot_strength_progress(patient_id):
-    df = load_patient_records(patient_id)
-    if df.empty or df["strength"].isna().all():
-        return None
-
-    plt.figure()
-    plt.plot(df["created_at"], df["strength"], marker='o')
-    plt.xlabel("Session Date")
-    plt.ylabel("Strength (grade)")
-    plt.title("Strength Progress Over Time")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    path = f"strength_progress_{patient_id}.png"
-    plt.savefig(path)
-    plt.close()
-    return path
-
-# ------------------------------------------------------------
-# 3. Pain Trend Plot
+# 1. Pain Trend Plot (0-10)
 # ------------------------------------------------------------
 def plot_pain_trend(patient_id):
+    """Generates a line plot of pain level over successive sessions."""
     df = load_patient_records(patient_id)
-    if df.empty or df["pain_level"].isna().all():
+    
+    # Filter for records that actually contain pain data
+    df_plot = df.dropna(subset=["pain_level"])
+
+    if df_plot.empty:
         return None
 
-    plt.figure()
-    plt.plot(df["created_at"], df["pain_level"], marker='o')
-    plt.xlabel("Session Date")
-    plt.ylabel("Pain Level (0–10)")
-    plt.title("Pain Trend Over Time")
-    plt.xticks(rotation=45)
+    plt.figure(figsize=(8, 4))
+    plt.plot(df_plot["session_number"], df_plot["pain_level"], 
+             marker='o', linestyle='-', color='#C0392B', linewidth=2)
+    
+    plt.xlabel("Session Number", fontsize=12)
+    plt.ylabel("Pain Level (0-10)", fontsize=12)
+    plt.title(f"Patient {patient_id} Pain Trend by Session", fontsize=14, fontweight='bold')
+    
+    # Set Y-axis limits for consistency (0 to 10)
+    plt.yticks(range(0, 11, 2))
+    plt.ylim(0, 10.5) 
+
+    # Set X-axis ticks to match session numbers
+    plt.xticks(df_plot["session_number"])
+    
+    plt.grid(True, which='major', linestyle='--', alpha=0.6)
     plt.tight_layout()
 
     path = f"pain_trend_{patient_id}.png"
@@ -131,79 +112,38 @@ def plot_pain_trend(patient_id):
     return path
 
 # ------------------------------------------------------------
-# 4. Swelling Trend Plot
+# 2. Strength Progress Plot (Manual Muscle Test Grade)
 # ------------------------------------------------------------
-def plot_swelling_trend(patient_id):
+def plot_strength_progress(patient_id):
+    """Generates a line plot of strength grade over successive sessions."""
     df = load_patient_records(patient_id)
-    if df.empty or df["swelling"].isna().all():
+    
+    # Filter for records that actually contain strength data
+    df_plot = df.dropna(subset=["strength"])
+
+    if df_plot.empty:
         return None
 
-    plt.figure()
-    plt.plot(df["created_at"], df["swelling"], marker='o')
-    plt.xlabel("Session Date")
-    plt.ylabel("Swelling (1=Yes / 0=No)")
-    plt.title("Swelling Trend Over Time")
-    plt.xticks(rotation=45)
+    plt.figure(figsize=(8, 4))
+    plt.plot(df_plot["session_number"], df_plot["strength"], 
+             marker='s', linestyle='-', color='#2980B9', linewidth=2)
+    
+    plt.xlabel("Session Number", fontsize=12)
+    plt.ylabel("Strength Grade (0-5)", fontsize=12)
+    plt.title(f"Patient {patient_id} Strength Progress by Session", fontsize=14, fontweight='bold')
+    
+    # Set Y-axis limits and labels for consistency (0 to 5 MMT grades)
+    plt.yticks(range(0, 6)) 
+    plt.ylim(0, 5.5) 
+    
+    # Set X-axis ticks to match session numbers
+    plt.xticks(df_plot["session_number"])
+    
+    plt.grid(True, which='major', linestyle='--', alpha=0.6)
     plt.tight_layout()
 
-    path = f"swelling_trend_{patient_id}.png"
+    path = f"strength_progress_{patient_id}.png"
     plt.savefig(path)
     plt.close()
     return path
 
-# ------------------------------------------------------------
-# 5. ROM vs Strength Scatter Plot
-# ------------------------------------------------------------
-def plot_rom_vs_strength(patient_id):
-    df = load_patient_records(patient_id)
-    if df.empty or df["rom"].isna().all() or df["strength"].isna().all():
-        return None
-
-    plt.figure()
-    plt.scatter(df["rom"], df["strength"])
-    plt.xlabel("ROM (deg)")
-    plt.ylabel("Strength (grade)")
-    plt.title("ROM vs Strength")
-    plt.tight_layout()
-
-    path = f"rom_vs_strength_{patient_id}.png"
-    plt.savefig(path)
-    plt.close()
-    return path
-
-# ------------------------------------------------------------
-# 6. Percentage Improvement Bar Chart
-# ------------------------------------------------------------
-def plot_improvement_percentage(patient_id):
-    df = load_patient_records(patient_id)
-    if df.empty or df.shape[0] < 2:
-        return None
-
-    try:
-        rom_change = ((df["rom"].iloc[-1] - df["rom"].iloc[0]) / df["rom"].iloc[0]) * 100
-    except:
-        rom_change = 0
-
-    try:
-        strength_change = ((df["strength"].iloc[-1] - df["strength"].iloc[0]) / df["strength"].iloc[0]) * 100
-    except:
-        strength_change = 0
-
-    try:
-        pain_change = -((df["pain_level"].iloc[-1] - df["pain_level"].iloc[0]) / df["pain_level"].iloc[0]) * 100
-    except:
-        pain_change = 0
-
-    labels = ["ROM %", "Strength %", "Pain %"]
-    values = [rom_change, strength_change, pain_change]
-
-    plt.figure()
-    plt.bar(labels, values)
-    plt.ylabel("Improvement (%)")
-    plt.title("Overall Recovery Percentage")
-    plt.tight_layout()
-
-    path = f"recovery_percent_{patient_id}.png"
-    plt.savefig(path)
-    plt.close()
-    return path
