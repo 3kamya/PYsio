@@ -80,6 +80,17 @@ def init_db():
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS rom_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER,
+        rom_type TEXT,
+        start_value INTEGER,
+        end_value INTEGER,
+        created_at TEXT,
+        FOREIGN KEY(patient_id) REFERENCES patients(id)
+    )
+    """)
     conn.commit()
     conn.close()
 
@@ -201,6 +212,30 @@ def add_user(username: str, password: str) -> bool:
         return False
     finally:
         conn.close()
+#---------range of motion table ------
+def add_rom_progress(patient_id, rom_type, start_value, end_value):
+    conn = sqlite3.connect("physio.db")
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO rom_progress (patient_id, rom_type, start_value, end_value, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+    """, (patient_id, rom_type, start_value, end_value))
+    conn.commit()
+    conn.close()
+# ----------loader for graphs -------
+def get_rom_progress(patient_id):
+    conn = sqlite3.connect("physio.db")
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT created_at, rom_type, start_value, end_value
+        FROM rom_progress
+        WHERE patient_id = ?
+        ORDER BY created_at ASC
+    """, (patient_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
 
 def verify_user(username: str, password: str) -> bool:
     conn = get_conn()
