@@ -6,10 +6,10 @@ from data_visualisation import (
     plot_strength_progress,
     plot_pain_trend,
     plot_swelling_trend,
-    plot_pain_histogram,
     plot_rom_vs_strength,
     plot_improvement_percentage
 )
+
 from ui_voice import voice_note_ui
 from compat_shim import (
     save_record_sql,
