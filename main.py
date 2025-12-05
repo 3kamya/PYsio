@@ -1,8 +1,8 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from ui_module import patient_form
+import json # Needed to parse nested session data
 
 # --- UPDATED IMPORTS: ONLY importing the two remaining functions ---
 from data_visualisation import (
@@ -120,25 +120,79 @@ elif page == "View Patients":
         if st.button("Load Patient"):
             
             patient_data = load_single_patient_sql(picked_id)
-            # Use get_sessions_for_patient function
             sessions = get_sessions_for_patient(int(picked_id)) 
             
-            st.subheader(f"Patient Record: ID {picked_id}")
-            st.json(patient_data)
+            st.subheader(f"Patient Demographics: ID {picked_id}")
+            # --- UPDATED: Display core info instead of verbose JSON dump ---
+            st.markdown(f"""
+            **Name:** {patient_data.get('name', 'N/A')} | **Age/Sex:** {patient_data.get('age', 'N/A')} / {patient_data.get('sex', 'N/A')}
+            **Procedure:** {patient_data.get('surgical_procedure', 'N/A')}
+            **Surgery Date:** {patient_data.get('surgery_date', 'N/A')}
+            **Initial Pain Level:** {patient_data.get('pain_level', 'N/A')} / 10
+            """)
+            # --- END UPDATED ---
             
             st.subheader("Session History")
             
             if sessions:
-                # Convert the sessions list of dicts to a DataFrame for clean display
                 sessions_df = pd.DataFrame(sessions)
+
+                # Helper function to extract summary data from the 'parsed' column
+                def extract_key_metrics(row):
+                    # The 'parsed' column should contain session details
+                    parsed_data = row['parsed']
+                    if isinstance(parsed_data, str):
+                        try:
+                            parsed_data = json.loads(parsed_data)
+                        except json.JSONDecodeError:
+                            return pd.Series({'ROM_Summary': 'N/A', 'Strength_Summary': 'N/A'})
+                    elif not isinstance(parsed_data, dict):
+                        return pd.Series({'ROM_Summary': 'N/A', 'Strength_Summary': 'N/A'})
+                    
+                    # Extract ROM (showing first entry as summary)
+                    rom_entries = parsed_data.get('rom_entries', [])
+                    rom_summary = "N/A"
+                    if rom_entries and isinstance(rom_entries, list) and rom_entries[0]:
+                        first_rom = rom_entries[0]
+                        rom_summary = f"Flex: {first_rom.get('rom', '?')}, Ext: {first_rom.get('extension', '?')}"
+                    
+                    # Extract Strength (showing first entry as summary)
+                    strength_entries = parsed_data.get('strength_entries', [])
+                    strength_summary = "N/A"
+                    if strength_entries and isinstance(strength_entries, list) and strength_entries[0]:
+                        first_strength = strength_entries[0]
+                        muscle = first_strength.get('muscle_group', 'Group')
+                        grade = first_strength.get('grade', '?')
+                        strength_summary = f"{muscle} ({grade})"
+
+                    return pd.Series({
+                        'ROM_Summary': rom_summary, 
+                        'Strength_Summary': strength_summary
+                    })
+
+                # Apply the extraction function to create new columns
+                if 'parsed' in sessions_df.columns:
+                     sessions_df[['ROM_Summary', 'Strength_Summary']] = sessions_df.apply(extract_key_metrics, axis=1)
                 
-                # Format the DataFrame to make it readable (optional but recommended)
-                # Drop long JSON fields for cleaner table view
-                sessions_df = sessions_df.drop(columns=['parsed_data'], errors='ignore')
-                sessions_df['timestamp'] = pd.to_datetime(sessions_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M')
-                sessions_df = sessions_df.rename(columns={'timestamp': 'Date/Time'})
+                # Format the DataFrame for clean display
+                sessions_df = sessions_df.drop(columns=['parsed', 'patient_id', 'id'], errors='ignore')
                 
-                st.dataframe(sessions_df)
+                # Rename and format date column (FIXED: Uses 'created_at' instead of 'timestamp')
+                if 'created_at' in sessions_df.columns:
+                    sessions_df['created_at'] = pd.to_datetime(sessions_df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+                    sessions_df = sessions_df.rename(columns={
+                        'created_at': 'Date/Time',
+                        'transcript': 'Notes',
+                        'pain_level': 'Pain (0-10)',
+                        'ROM_Summary': 'ROM',
+                        'Strength_Summary': 'Strength'
+                    })
+                
+                # Define the final columns to display
+                display_cols = ['Date/Time', 'Pain (0-10)', 'ROM', 'Strength', 'Notes']
+                final_cols = [col for col in display_cols if col in sessions_df.columns]
+
+                st.dataframe(sessions_df[final_cols], use_container_width=True)
                 
             else:
                 st.info("No session history found for this patient.")
