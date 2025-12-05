@@ -115,19 +115,35 @@ def voice_note_ui():
                 updates["swelling_location"] = swelling_data["location"]
 
     # ROM
-    if parsed.get("rom"):
-        patient = get_patient(pid)
-        rom_entries = []
-        if patient and patient.get("rom_entries"):
-            try:
-                rom_entries = json.loads(patient["rom_entries"])
-            except:
-                rom_entries = []
+    # --- ROM ---
+if parsed.get("rom"):
+    patient = get_patient(pid)
 
-        for r in parsed["rom"]:
-            rom_entries.append({"joint": r[0], "value": r[1]})
+    # Load existing latest ROM (for quick view)
+    rom_entries = []
+    if patient and patient.get("rom_entries"):
+        try:
+            rom_entries = json.loads(patient["rom_entries"])
+        except:
+            rom_entries = []
 
-        updates["rom_entries"] = rom_entries
+    # Save each parsed ROM entry
+    for item in parsed["rom"]:
+        rom_type = item["rom_type"]
+        start_val = item["start"]
+        end_val = item["end"]
+
+        # 1. Save in patient.latest ROM
+        rom_entries.append({
+            "joint": rom_type,
+            "start": start_val,
+            "end": end_val
+        })
+
+        # 2. Save to rom_progress table
+        add_rom_progress(pid, rom_type, start_val, end_val)
+
+    updates["rom_entries"] = json.dumps(rom_entries)
 
     # Strength
     if parsed.get("strength"):
