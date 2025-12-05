@@ -1,6 +1,6 @@
 # auth_ui.py
 import streamlit as st
-from data_module import verify_user, add_user
+from datamod_sql import verify_user, add_user
 
 def auth_ui():
     st.sidebar.subheader("Account")
