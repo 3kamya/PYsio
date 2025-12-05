@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from ui_module import patient_form
-from data_visualization import (
+from data_visualisation import (
     plot_rom_progress,
     plot_strength_progress,
     plot_pain_trend,
