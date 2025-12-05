@@ -17,7 +17,8 @@ from compat_shim import (
     load_single_patient_sql,
     generate_patient_pdf,
     convert_voice_to_text,
-    extract_structured_keywords
+    extract_structured_keywords,
+    add_session
 )
 
 
