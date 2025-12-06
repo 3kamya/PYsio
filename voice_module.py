@@ -12,7 +12,7 @@ def transcribe_microphone():
         print("Listening...")
         # Use a timeout to prevent indefinite hanging if no audio is detected
         try:
-            audio = r.listen(source, timeout=5, phrase_time_limit=15)
+            audio = r.listen(source, timeout=15, phrase_time_limit=25)
         except sr.WaitTimeoutError:
             print("No speech detected within the time limit.")
             return ""
