@@ -83,7 +83,7 @@ Week 5
 **FUTURE IMPROVEMENTS**
 +--------------------------------------------+----------------------------------------------+
 | Feature                                     | Description                                  |
-+--------------------------------------------+----------------------------------------------+
++--------------------------------------------+----------------------------------------------+ 
 | Patient-facing portal                       | Patients can log in and view their progress |
 | AI-driven voice note understanding          | NLP model to read natural speech notes      |
 | Expansion to OT and sports rehab            | Multi-disciplinary rehabilitation platform  |
