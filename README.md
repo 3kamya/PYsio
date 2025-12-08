@@ -60,3 +60,32 @@ Architecture Updates
 
 Testing
 *Write basic functional tests to ensure database reads, writes, and updates are working correctly.*
+Week 4
++-------------------------------------+-----------------------------------------------+
+| Addition                            | Description                                   |
++-------------------------------------+-----------------------------------------------+
+| Upgraded voice parser               | More accurate extraction of clinical metrics  |
+| Multi-entry support                 | ROM + strength + pain at once                 |
+| Voice parsing UI                    | Clear transcript → parsed → apply flow        |
+| New visualizations                  | Multiple time-series graphs                   |
+| Database compatibility layer        | Cleaner bridging between UI and database      |
++-------------------------------------+-----------------------------------------------+
+Week 5
++-------------------------------------+-----------------------------------------------+
+| Addition                            | Description                                   |
++-------------------------------------+-----------------------------------------------+
+| PDF export module                   | Professional session summary PDFs             |
+| Embedded graphs in PDFs             | Pain/ROM trends rendered automatically        |
+| EXE packaging                       | Windows-friendly distribution                  |
+| Error-handling fixes                | More stable patient ID + field handling       |
+| DB-UI compatibility improvements    | Main app logic simplified and unified         |
++-------------------------------------+-----------------------------------------------+
+**FUTURE IMPROVEMENTS**
++--------------------------------------------+----------------------------------------------+
+| Feature                                     | Description                                  |
++--------------------------------------------+----------------------------------------------+
+| Patient-facing portal                       | Patients can log in and view their progress |
+| AI-driven voice note understanding          | NLP model to read natural speech notes      |
+| Expansion to OT and sports rehab            | Multi-disciplinary rehabilitation platform  |
+| Automated recovery anomaly detection        | ML detects slow or abnormal progress        |
++--------------------------------------------+----------------------------------------------+
